@@ -14,8 +14,11 @@ export function activate(context: vscode.ExtensionContext) {
                 sidebarProvider.updateStats(stats);
             }
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorStack = error instanceof Error ? error.stack : '';
             console.error('Graphium: Failed to generate dependency graph.', error);
-            void vscode.window.showErrorMessage('Graphium: Failed to generate dependency graph. Check Extension Host logs for details.');
+            console.error('Graphium: Error stack:', errorStack);
+            void vscode.window.showErrorMessage(`Graphium: ${errorMessage}`);
         }
     };
 
@@ -36,8 +39,9 @@ export function activate(context: vscode.ExtensionContext) {
                 void vscode.window.showErrorMessage('Graphium: No active graph to export. Please generate one first.');
             }
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
             console.error('Graphium: Failed to export graph.', error);
-            void vscode.window.showErrorMessage('Graphium: Failed to export graph. Check Extension Host logs for details.');
+            void vscode.window.showErrorMessage(`Graphium: ${errorMessage}`);
         }
     });
 
