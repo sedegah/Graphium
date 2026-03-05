@@ -11,6 +11,11 @@ interface CacheEntry {
 
 const parseCache = new Map<string, CacheEntry>();
 export let currentPanel: vscode.WebviewPanel | undefined;
+let webviewMessageDisposable: vscode.Disposable | undefined;
+
+function escapeForInlineScript(json: string): string {
+    return json.replace(/<\//g, '<\\/').replace(/<!--/g, '<\\!--');
+}
 
 export async function generateDependencyGraph(context: vscode.ExtensionContext) {
     const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -21,8 +26,11 @@ export async function generateDependencyGraph(context: vscode.ExtensionContext) 
 
     const rootPath = workspaceFolders[0].uri.fsPath;
 
-    // Find all JS/TS files ignoring node_modules
-    const files = await vscode.workspace.findFiles('**/*.{js,ts,jsx,tsx}', '**/node_modules/**');
+    // Find all JS/TS files while ignoring common generated directories.
+    const files = await vscode.workspace.findFiles(
+        '**/*.{js,ts,jsx,tsx}',
+        '**/{node_modules,out,dist,.next,coverage,.git,src/webview/libs,media}/**'
+    );
 
     const dependencyMap: Record<string, FileMetadata> = {};
 
@@ -46,7 +54,8 @@ export async function generateDependencyGraph(context: vscode.ExtensionContext) 
         }
     }
 
-    // Detect circular dependencies
+    // Detect circular dependencies for workspace-local files only.
+    const localFiles = new Set(Object.keys(dependencyMap));
     const cycles: [string, string][] = [];
     const visited = new Set<string>();
     const recStack = new Set<string>();
@@ -58,6 +67,9 @@ export async function generateDependencyGraph(context: vscode.ExtensionContext) 
 
             const deps = dependencyMap[node]?.dependencies || [];
             for (const dep of deps) {
+                if (!localFiles.has(dep.path)) {
+                    continue;
+                }
                 if (!visited.has(dep.path)) {
                     detectCycle(dep.path);
                 } else if (recStack.has(dep.path)) {
@@ -87,12 +99,14 @@ export async function generateDependencyGraph(context: vscode.ExtensionContext) 
         );
 
         currentPanel.iconPath = {
-            light: vscode.Uri.file(path.join(context.extensionPath, '1.png')),
-            dark: vscode.Uri.file(path.join(context.extensionPath, '2.png'))
+            light: vscode.Uri.file(path.join(context.extensionPath, 'media', 'graphium-sidebar.svg')),
+            dark: vscode.Uri.file(path.join(context.extensionPath, 'media', 'graphium-sidebar.svg'))
         };
 
         currentPanel.onDidDispose(() => {
             currentPanel = undefined;
+            webviewMessageDisposable?.dispose();
+            webviewMessageDisposable = undefined;
         }, null, context.subscriptions);
     }
 
@@ -120,8 +134,8 @@ export async function generateDependencyGraph(context: vscode.ExtensionContext) 
         .replace('{{styleUri}}', cssUri.toString())
         .replace('{{scriptUri}}', jsUri.toString())
         .replace('{{cspSource}}', webview.cspSource)
-        .replace('{{graphData}}', JSON.stringify(dependencyMap))
-        .replace('{{cycleData}}', JSON.stringify(cycles))
+        .replace('{{graphData}}', escapeForInlineScript(JSON.stringify(dependencyMap)))
+        .replace('{{cycleData}}', escapeForInlineScript(JSON.stringify(cycles)))
         // Libraries
         .replace('{{libCytoscape}}', libCytoscape.toString())
         .replace('{{libLayoutBase}}', libLayoutBase.toString())
@@ -134,8 +148,11 @@ export async function generateDependencyGraph(context: vscode.ExtensionContext) 
 
     webview.html = htmlContent;
 
+    // Ensure only one message handler is active for the panel lifecycle.
+    webviewMessageDisposable?.dispose();
+
     // Handle messages from webview
-    webview.onDidReceiveMessage(
+    webviewMessageDisposable = webview.onDidReceiveMessage(
         async message => {
             switch (message.command) {
                 case 'log':

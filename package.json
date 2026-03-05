@@ -19,7 +19,7 @@
         {
           "id": "graphium-explorer",
           "title": "Graphium",
-          "icon": "1.png"
+          "icon": "media/graphium-sidebar.svg"
         }
       ]
     },
@@ -29,7 +29,7 @@
           "type": "webview",
           "id": "graphiumSidebar",
           "name": "Graphium Tools",
-          "icon": "1.png",
+          "icon": "media/graphium-sidebar.svg",
           "visibility": "visible"
         }
       ]

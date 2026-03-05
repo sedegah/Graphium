@@ -70,8 +70,21 @@ Object.keys(graphData).forEach(source => {
 
 let cy;
 try {
+    const container = document.getElementById('cy');
+    if (!container) {
+        throw new Error('Graph container #cy was not found');
+    }
+
+    if (elements.length === 0) {
+        container.innerHTML = '<div style="padding: 20px; color: #8b949e;">No JS/TS files with dependencies were found in this workspace selection.</div>';
+    }
+
+    // Use fcose when available; fall back to the built-in cose layout if plugin registration fails.
+    const canUseFcose = typeof window.cytoscapeFcose !== 'undefined';
+    const layoutName = canUseFcose ? 'fcose' : 'cose';
+
     cy = cytoscape({
-        container: document.getElementById('cy'),
+        container,
         elements: elements,
         style: [
             {
@@ -119,7 +132,7 @@ try {
             }
         ],
         layout: {
-            name: 'fcose',
+            name: layoutName,
             quality: 'default',
             fit: true,
             padding: 50,
@@ -162,6 +175,10 @@ try {
 
 } catch (e) {
     console.error('Cytoscape initialization failed:', e);
+    const container = document.getElementById('cy');
+    if (container) {
+        container.innerHTML = '<div style="padding: 20px; color: #f85149;">Graphium failed to render graph. Open VS Code Developer Tools for details.</div>';
+    }
 }
 
 if (cy) {
@@ -171,6 +188,9 @@ if (cy) {
 }
 
 document.getElementById('filter').addEventListener('input', (e) => {
+    if (!cy) {
+        return;
+    }
     const val = e.target.value.toLowerCase();
     if (!val) {
         cy.elements().show();
@@ -183,12 +203,26 @@ document.getElementById('filter').addEventListener('input', (e) => {
 });
 
 document.getElementById('reset').addEventListener('click', () => {
+    if (!cy) {
+        return;
+    }
     document.getElementById('filter').value = '';
     cy.elements().show();
     cy.layout({ name: 'fcose', animate: true }).run();
 });
 
 document.getElementById('export').addEventListener('click', () => {
+    if (!cy) {
+        return;
+    }
+    const b64 = cy.png({ output: 'base64', full: true });
+    vscode.postMessage({ command: 'saveImage', data: b64 });
+});
+
+window.addEventListener('message', (event) => {
+    if (!event?.data || event.data.command !== 'triggerExport' || !cy) {
+        return;
+    }
     const b64 = cy.png({ output: 'base64', full: true });
     vscode.postMessage({ command: 'saveImage', data: b64 });
 });
