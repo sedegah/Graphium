@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{PROJECT_NAME}} - Dependency Graph</title>
+    <link rel="stylesheet" href="https://unpkg.com/tippy.js@6.3.7/dist/tippy.css"/>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d30 100%);
+            color: #cccccc;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .header {
+            background: rgba(37, 37, 38, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #3e3e42;
+            padding: 16px 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .project-name {
+            font-size: 24px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 8px;
+        }
+
+        .stats-container {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #858585;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #4ec9b0;
+        }
+
+        .controls {
+            background: rgba(37, 37, 38, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #3e3e42;
+            padding: 12px 24px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+            max-width: 400px;
+            padding: 8px 12px;
+            background: #3c3c3c;
+            border: 1px solid #555555;
+            border-radius: 4px;
+            color: #cccccc;
+            font-size: 13px;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .search-box:focus {
+            border-color: #007acc;
+            background: #2d2d30;
+        }
+
+        .search-box::placeholder {
+            color: #858585;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            background: #0e639c;
+            border: none;
+            border-radius: 4px;
+            color: #ffffff;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .btn:hover {
+            background: #1177bb;
+        }
+
+        .btn:active {
+            background: #0d5a8f;
+        }
+
+        .btn-secondary {
+            background: #404040;
+        }
+
+        .btn-secondary:hover {
+            background: #4a4a4a;
+        }
+
+        #cy {
+            flex: 1;
+            background: #1e1e1e;
+            position: relative;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 1000;
+        }
+
+        .loading-spinner {
+            border: 3px solid #333;
+            border-top: 3px solid #4ec9b0;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 12px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(229, 20, 0, 0.1);
+            border: 1px solid #e51400;
+            border-radius: 4px;
+            padding: 24px;
+            max-width: 500px;
+            color: #f48771;
+        }
+
+        .error h2 {
+            color: #f48771;
+            margin-bottom: 12px;
+        }
+
+        .error pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 4px;
+            overflow: auto;
+            font-size: 12px;
+            margin-top: 12px;
+        }
+
+        .tippy-box {
+            background-color: #2d2d30;
+            border: 1px solid #454545;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .tippy-content {
+            padding: 8px 12px;
+            color: #cccccc;
+            font-size: 12px;
+        }
+
+        .tippy-arrow {
+            color: #2d2d30;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="project-name">Project: {{PROJECT_NAME}}</div>
+            <div class="stats-container">
+                <div class="stat">
+                    <div class="stat-label">Total Files</div>
+                    <div class="stat-value">{{FILE_COUNT}}</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">TypeScript</div>
+                    <div class="stat-value">{{TS_COUNT}}</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">JavaScript</div>
+                    <div class="stat-value">{{JS_COUNT}}</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Dependencies</div>
+                    <div class="stat-value">{{EDGE_COUNT}}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <input type="text" id="search" class="search-box" placeholder="Filter files...">
+            <button id="reset-btn" class="btn btn-secondary">Reset View</button>
+            <button id="fit-btn" class="btn">Fit to Screen</button>
+            <button id="export-btn" class="btn">Export PNG</button>
+        </div>
+
+        <div id="cy">
+            <div class="loading" id="loading">
+                <div class="loading-spinner"></div>
+                <div>Loading graph...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/layout-base/layout-base.js"></script>
+    <script src="https://unpkg.com/cose-base/cose-base.js"></script>
+    <script src="https://unpkg.com/cytoscape-fcose@2.2.0/cytoscape-fcose.js"></script>
+    <script src="https://unpkg.com/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
+    <script src="https://unpkg.com/tippy.js@6.3.7/dist/tippy.umd.min.js"></script>
+    <script src="https://unpkg.com/cytoscape-popper@2.0.0/cytoscape-popper.js"></script>
+
+    <script>
+        console.log('Initializing Graphium dependency graph...');
+        
+        let cy = null;
+
+        function showError(message, details) {
+            console.error('Graph Error:', message, details);
+            const loading = document.getElementById('loading');
+            if (loading) loading.remove();
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.innerHTML = `
+                <h2>Failed to Load Graph</h2>
+                <p>${message}</p>
+                ${details ? `<pre>${details}</pre>` : ''}
+            `;
+            document.getElementById('cy').appendChild(errorDiv);
+        }
+
+        function initGraph() {
+            try {
+                // Validate data replacement
+                const projectName = '{{PROJECT_NAME}}';
+                if (projectName.includes('{{') || projectName.includes('}}')) {
+                    throw new Error('Template variables not properly replaced');
+                }
+
+                // Parse graph data
+                const elementsData = <!--CYTOSCAPE_ELEMENTS-->;
+                
+                if (!elementsData || !Array.isArray(elementsData)) {
+                    throw new Error('Invalid graph data structure');
+                }
+
+                console.log(`Loaded ${elementsData.length} elements`);
+
+                // Initialize Cytoscape
+                cy = cytoscape({
+                    container: document.getElementById('cy'),
+                    elements: elementsData,
+                    style: [
+                        {
+                            selector: 'node',
+                            style: {
+                                'background-color': '#4ec9b0',
+                                'label': 'data(label)',
+                                'color': '#ffffff',
+                                'text-valign': 'center',
+                                'text-halign': 'center',
+                                'font-size': '11px',
+                                'font-weight': '500',
+                                'text-outline-width': 2,
+                                'text-outline-color': '#1e1e1e',
+                                'border-width': 2,
+                                'border-color': '#6ec9b0',
+                                'width': 'label',
+                                'height': 'label',
+                                'padding': '12px',
+                                'shape': 'roundrectangle',
+                                'text-wrap': 'wrap',
+                                'text-max-width': '120px'
+                            }
+                        },
+                        {
+                            selector: 'node[type="typescript"]',
+                            style: {
+                                'background-color': '#3178c6',
+                                'border-color': '#5198e6'
+                            }
+                        },
+                        {
+                            selector: 'node[type="javascript"]',
+                            style: {
+                                'background-color': '#f0db4f',
+                                'color': '#323330',
+                                'text-outline-color': '#f0db4f',
+                                'border-color': '#f4e165'
+                            }
+                        },
+                        {
+                            selector: 'edge',
+                            style: {
+                                'width': 2,
+                                'line-color': '#555555',
+                                'target-arrow-color': '#555555',
+                                'target-arrow-shape': 'triangle',
+                                'curve-style': 'bezier',
+                                'arrow-scale': 1.2
+                            }
+                        },
+                        {
+                            selector: 'node.highlighted',
+                            style: {
+                                'border-width': 3,
+                                'border-color': '#ff6b6b',
+                                'background-color': '#ff6b6b'
+                            }
+                        },
+                        {
+                            selector: 'edge.highlighted',
+                            style: {
+                                'line-color': '#ff6b6b',
+                                'target-arrow-color': '#ff6b6b',
+                                'width': 3
+                            }
+                        },
+                        {
+                            selector: 'node.faded',
+                            style: {
+                                'opacity': 0.3
+                            }
+                        },
+                        {
+                            selector: 'edge.faded',
+                            style: {
+                                'opacity': 0.1
+                            }
+                        }
+                    ],
+                    layout: {
+                        name: 'fcose',
+                        quality: 'proof',
+                        animate: true,
+                        animationDuration: 1000,
+                        randomize: false,
+                        fit: true,
+                        padding: 50,
+                        nodeDimensionsIncludeLabels: true,
+                        uniformNodeDimensions: false,
+                        packComponents: true,
+                        nodeRepulsion: 4500,
+                        idealEdgeLength: 100,
+                        edgeElasticity: 0.45,
+                        nestingFactor: 0.1,
+                        gravity: 0.25,
+                        numIter: 2500,
+                        tile: true,
+                        tilingPaddingVertical: 10,
+                        tilingPaddingHorizontal: 10,
+                        gravityRangeCompound: 1.5,
+                        gravityCompound: 1.0,
+                        gravityRange: 3.8
+                    },
+                    minZoom: 0.1,
+                    maxZoom: 3,
+                    wheelSensitivity: 0.2
+                });
+
+                console.log('Graph initialized successfully');
+
+                // Add tooltips
+                cy.nodes().forEach(node => {
+                    const ref = node.popperRef();
+                    const dummyDomEle = document.createElement('div');
+                    
+                    const tip = tippy(dummyDomEle, {
+                        getReferenceClientRect: ref.getBoundingClientRect,
+                        content: () => {
+                            const div = document.createElement('div');
+                            const data = node.data();
+                            div.innerHTML = `
+                                <strong>${data.label}</strong><br>
+                                <small>Type: ${data.type}</small><br>
+                                <small>Path: ${data.path}</small><br>
+                                <small>Classes: ${data.classes || 0}</small><br>
+                                <small>Functions: ${data.functions || 0}</small><br>
+                                <small>Exports: ${data.exports || 0}</small>
+                            `;
+                            return div;
+                        },
+                        trigger: 'manual',
+                        arrow: true,
+                        placement: 'top',
+                        hideOnClick: false,
+                        multiple: true,
+                        sticky: true
+                    });
+
+                    node.on('mouseover', () => tip.show());
+                    node.on('mouseout', () => tip.hide());
+                    node.on('drag', () => tip.hide());
+                });
+
+                // Event handlers
+                cy.on('tap', 'node', function(evt) {
+                    const node = evt.target;
+                    cy.elements().removeClass('highlighted faded');
+                    
+                    node.addClass('highlighted');
+                    node.connectedEdges().addClass('highlighted');
+                    node.neighborhood('node').addClass('highlighted');
+                    
+                    cy.elements().not(node.neighborhood().add(node)).addClass('faded');
+                });
+
+                cy.on('tap', function(evt) {
+                    if (evt.target === cy) {
+                        cy.elements().removeClass('highlighted faded');
+                    }
+                });
+
+                // Controls
+                const searchBox = document.getElementById('search');
+                let searchTimeout;
+
+                searchBox.addEventListener('input', (e) => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        const query = e.target.value.toLowerCase().trim();
+                        cy.elements().removeClass('highlighted faded');
+                        
+                        if (query) {
+                            const matches = cy.nodes().filter(node => 
+                                node.data('label').toLowerCase().includes(query) ||
+                                node.data('path').toLowerCase().includes(query)
+                            );
+                            
+                            if (matches.length > 0) {
+                                matches.addClass('highlighted');
+                                matches.connectedEdges().addClass('highlighted');
+                                cy.elements().not(matches.neighborhood().add(matches)).addClass('faded');
+                            }
+                        }
+                    }, 300);
+                });
+
+                document.getElementById('reset-btn').addEventListener('click', () => {
+                    searchBox.value = '';
+                    cy.elements().removeClass('highlighted faded');
+                    cy.fit(null, 50);
+                });
+
+                document.getElementById('fit-btn').addEventListener('click', () => {
+                    cy.fit(null, 50);
+                });
+
+                document.getElementById('export-btn').addEventListener('click', () => {
+                    const png = cy.png({
+                        output: 'blob',
+                        bg: '#1e1e1e',
+                        full: true,
+                        scale: 2
+                    });
+                    
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(png);
+                    link.download = 'dependency-graph.png';
+                    link.click();
+                });
+
+                // Hide loading
+                const loading = document.getElementById('loading');
+                if (loading) loading.remove();
+
+                console.log('Graph ready');
+
+            } catch (error) {
+                showError(error.message, error.stack);
+            }
+        }
+
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initGraph);
+        } else {
+            initGraph();
+        }
+    </script>
+</body>
+</html>
