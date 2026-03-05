@@ -3,12 +3,12 @@
   "displayName": "Graphium",
   "publisher": "graphium-dev",
   "icon": "1.png",
-  "description": "Visualize the structure and dependencies of a codebase interactively in VS Code",
+  "description": "Dependency graph generator for codebases",
   "version": "0.1.0",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sedegah/Graphium.git"
+    "url": "https://github.com/sedegah/graphium"
   },
   "homepage": "https://github.com/sedegah/Graphium#readme",
   "bugs": {
@@ -22,6 +22,9 @@
     "Other"
   ],
   "keywords": [
+    "graph",
+    "dependency",
+    "visualization",
     "dependency-graph",
     "typescript",
     "javascript",
