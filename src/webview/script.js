@@ -14,14 +14,22 @@ const COLORS = {
 const graphData = window.graphData || {};
 const cycleData = window.cycleData || [];
 const cyclePairs = new Set(cycleData.map((pair) => pair[0] + '->' + pair[1]));
+const circularNodes = new Set();
+cycleData.forEach((pair) => {
+    if (pair && pair.length >= 2) {
+        circularNodes.add(pair[0]);
+        circularNodes.add(pair[1]);
+    }
+});
 
 const nodeList = Object.keys(graphData).map((id) => {
     const data = graphData[id] || {};
     return {
         id,
         label: id.split('/').pop() || id,
+        searchText: id.toLowerCase(),
         color: getExtColor(id),
-        isCircular: cycleData.some((c) => c[0] === id || c[1] === id),
+        isCircular: circularNodes.has(id),
         classes: Array.isArray(data.classes) ? data.classes : [],
         functions: Array.isArray(data.functions) ? data.functions : []
     };
@@ -48,6 +56,15 @@ Object.keys(graphData).forEach((source) => {
 let cy = null;
 let lastLayoutName = 'cose';
 let fallbackApi = null;
+const graphScale = {
+    nodeCount: nodeList.length,
+    edgeCount: edgeList.length
+};
+const perfMode = {
+    large: graphScale.nodeCount > 220 || graphScale.edgeCount > 500,
+    huge: graphScale.nodeCount > 550 || graphScale.edgeCount > 1400
+};
+let filterDebounceHandle = null;
 
 function getExtColor(filename) {
     if (filename.endsWith('.ts') || filename.endsWith('.tsx')) return COLORS.ts;
@@ -87,10 +104,16 @@ function renderWithCytoscape(container) {
 
     const canUseFcose = typeof window.cytoscapeFcose !== 'undefined';
     lastLayoutName = canUseFcose ? 'fcose' : 'cose';
+    if (perfMode.large) {
+        lastLayoutName = 'cose';
+    }
 
     cy = window.cytoscape({
         container,
         elements,
+        pixelRatio: 1,
+        hideEdgesOnViewport: perfMode.large,
+        textureOnViewport: perfMode.large,
         style: [
             {
                 selector: 'node',
@@ -99,6 +122,7 @@ function renderWithCytoscape(container) {
                     'label': 'data(label)',
                     'color': COLORS.text,
                     'font-size': '11px',
+                    'min-zoomed-font-size': perfMode.large ? 11 : 7,
                     'text-valign': 'bottom',
                     'text-halign': 'center',
                     'text-margin-y': 8,
@@ -115,7 +139,7 @@ function renderWithCytoscape(container) {
                     'line-color': COLORS.edge,
                     'target-arrow-color': COLORS.edge,
                     'target-arrow-shape': 'triangle',
-                    'curve-style': 'bezier',
+                    'curve-style': perfMode.huge ? 'haystack' : 'bezier',
                     'opacity': 0.8
                 }
             },
@@ -140,7 +164,7 @@ function renderWithCytoscape(container) {
             name: lastLayoutName,
             fit: true,
             padding: 40,
-            animate: true
+            animate: !perfMode.large
         }
     });
 
@@ -148,7 +172,7 @@ function renderWithCytoscape(container) {
         window.vscode.postMessage({ command: 'openFile', text: evt.target.id() });
     });
 
-    if (typeof window.tippy === 'function') {
+    if (typeof window.tippy === 'function' && !perfMode.large) {
         cy.nodes().forEach((node) => {
             const data = node.data();
             const classCount = Array.isArray(data.classes) ? data.classes.length : 0;
@@ -369,27 +393,37 @@ const exportButton = document.getElementById('export');
 
 filterInput.addEventListener('input', (e) => {
     const val = (e.target && e.target.value ? e.target.value : '').toLowerCase();
-    if (cy) {
-        if (!val) {
-            cy.elements().show();
-        } else {
-            cy.elements().hide();
-            const matches = cy.nodes().filter((n) => n.id().toLowerCase().indexOf(val) >= 0);
-            matches.show();
-            matches.connectedEdges().show();
+    if (filterDebounceHandle) {
+        window.clearTimeout(filterDebounceHandle);
+    }
+    filterDebounceHandle = window.setTimeout(() => {
+        if (cy) {
+            cy.batch(() => {
+                if (!val) {
+                    cy.elements().show();
+                } else {
+                    cy.elements().hide();
+                    const matches = cy.nodes().filter((n) => {
+                        const searchText = n.data('searchText') || n.id().toLowerCase();
+                        return searchText.indexOf(val) >= 0;
+                    });
+                    matches.show();
+                    matches.connectedEdges().show();
+                }
+            });
+            return;
         }
-        return;
-    }
-    if (fallbackApi) {
-        fallbackApi.applyFilter(val);
-    }
+        if (fallbackApi) {
+            fallbackApi.applyFilter(val);
+        }
+    }, 120);
 });
 
 resetButton.addEventListener('click', () => {
     filterInput.value = '';
     if (cy) {
         cy.elements().show();
-        cy.layout({ name: lastLayoutName, animate: true, fit: true, padding: 40 }).run();
+        cy.layout({ name: lastLayoutName, animate: !perfMode.large, fit: true, padding: 40 }).run();
         return;
     }
     if (fallbackApi) {
