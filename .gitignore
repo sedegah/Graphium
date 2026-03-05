@@ -5,6 +5,7 @@ node_modules/
 out/
 dist/
 build/
+*.vsix
 
 # VS Code specific
 .vscode-test/
