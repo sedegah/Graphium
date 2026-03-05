@@ -56,11 +56,13 @@
         window.cycleData = JSON.parse(document.getElementById('cycle-data').textContent || '[]');
         window.__graphiumBooted = false;
 
-        // Emergency fallback if external script fails to load/execute in host webview.
+        // Fallback renderer for hosts where external script loading is unreliable.
         setTimeout(function () {
             if (window.__graphiumBooted) {
                 return;
             }
+
+            window.__graphiumBooted = true;
 
             var container = document.getElementById('cy');
             if (!container) {
@@ -75,64 +77,399 @@
             }
 
             var width = Math.max(container.clientWidth || 1000, 900);
-            var height = Math.max(container.clientHeight || 700, 600);
-            var cx = width / 2;
-            var cy = height / 2;
-            var radius = Math.max(160, Math.min(width, height) * 0.34);
-            var positions = {};
+            var height = Math.max(container.clientHeight || 700, 620);
+            var nodeMap = {};
+            var nodes = [];
+            var links = [];
 
-            for (var i = 0; i < nodeIds.length; i++) {
-                var id = nodeIds[i];
-                var angle = (i / nodeIds.length) * Math.PI * 2;
-                positions[id] = {
-                    x: cx + radius * Math.cos(angle),
-                    y: cy + radius * Math.sin(angle)
+            for (var ni = 0; ni < nodeIds.length; ni++) {
+                var nid = nodeIds[ni];
+                var node = {
+                    id: nid,
+                    label: nid.split('/').pop() || nid,
+                    x: (Math.random() * 0.7 + 0.15) * width,
+                    y: (Math.random() * 0.7 + 0.15) * height,
+                    vx: 0,
+                    vy: 0,
+                    visible: true
                 };
+                nodeMap[nid] = node;
+                nodes.push(node);
             }
 
-            var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + width + ' ' + height + '" width="100%" height="100%" style="background:#111;display:block">';
-            svg += '<defs><marker id="g-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#ffffff"/></marker></defs>';
-
-            for (var s = 0; s < nodeIds.length; s++) {
-                var source = nodeIds[s];
+            for (var si = 0; si < nodeIds.length; si++) {
+                var source = nodeIds[si];
                 var deps = (graphData[source] && graphData[source].dependencies) || [];
-                for (var d = 0; d < deps.length; d++) {
-                    var dep = deps[d];
+                for (var di = 0; di < deps.length; di++) {
+                    var dep = deps[di];
                     var target = typeof dep === 'string' ? dep : dep.path;
-                    if (!positions[target]) {
-                        continue;
+                    if (nodeMap[source] && nodeMap[target]) {
+                        links.push({
+                            source: nodeMap[source],
+                            target: nodeMap[target],
+                            visible: true
+                        });
                     }
-                    var p1 = positions[source];
-                    var p2 = positions[target];
-                    svg += '<line x1="' + p1.x + '" y1="' + p1.y + '" x2="' + p2.x + '" y2="' + p2.y + '" stroke="#ffffff" stroke-opacity="0.75" stroke-width="1.3" marker-end="url(#g-arrow)" />';
                 }
             }
 
-            for (var n = 0; n < nodeIds.length; n++) {
-                var nodeId = nodeIds[n];
-                var p = positions[nodeId];
-                var label = nodeId.split('/').pop() || nodeId;
-                var safeNode = nodeId.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                var safeLabel = label.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                svg += '<g data-node="' + safeNode + '" style="cursor:pointer">';
-                svg += '<circle cx="' + p.x + '" cy="' + p.y + '" r="12" fill="#58a6ff" stroke="#ffffff" stroke-width="1.8" />';
-                svg += '<text x="' + p.x + '" y="' + (p.y + 24) + '" fill="#ffffff" font-size="11" text-anchor="middle">' + safeLabel + '</text>';
-                svg += '<title>' + safeNode + '</title>';
-                svg += '</g>';
+            var ns = 'http://www.w3.org/2000/svg';
+            var svg = document.createElementNS(ns, 'svg');
+            svg.setAttribute('xmlns', ns);
+            svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+            svg.setAttribute('width', '100%');
+            svg.setAttribute('height', '100%');
+            svg.style.background = '#111';
+            svg.style.display = 'block';
+
+            var defs = document.createElementNS(ns, 'defs');
+            var marker = document.createElementNS(ns, 'marker');
+            marker.setAttribute('id', 'g-arrow');
+            marker.setAttribute('viewBox', '0 0 10 10');
+            marker.setAttribute('refX', '9');
+            marker.setAttribute('refY', '5');
+            marker.setAttribute('markerWidth', '6');
+            marker.setAttribute('markerHeight', '6');
+            marker.setAttribute('orient', 'auto-start-reverse');
+            var mPath = document.createElementNS(ns, 'path');
+            mPath.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
+            mPath.setAttribute('fill', '#ffffff');
+            marker.appendChild(mPath);
+            defs.appendChild(marker);
+            svg.appendChild(defs);
+
+            var viewport = document.createElementNS(ns, 'g');
+            svg.appendChild(viewport);
+
+            var edgeLayer = document.createElementNS(ns, 'g');
+            var nodeLayer = document.createElementNS(ns, 'g');
+            viewport.appendChild(edgeLayer);
+            viewport.appendChild(nodeLayer);
+
+            function createEl(name) {
+                return document.createElementNS(ns, name);
             }
 
-            svg += '</svg>';
-            container.innerHTML = '<div style="position:absolute;top:56px;left:20px;z-index:11;background:#1f2937;color:#fff;padding:6px 10px;border:1px solid #374151;border-radius:6px;font-size:11px;">Emergency graph mode (script load fallback)</div>' + svg;
+            for (var li = 0; li < links.length; li++) {
+                var line = createEl('line');
+                line.setAttribute('stroke', '#ffffff');
+                line.setAttribute('stroke-opacity', '0.74');
+                line.setAttribute('stroke-width', '1.35');
+                line.setAttribute('marker-end', 'url(#g-arrow)');
+                edgeLayer.appendChild(line);
+                links[li].el = line;
+            }
 
-            var groups = container.querySelectorAll('g[data-node]');
-            for (var g = 0; g < groups.length; g++) {
-                groups[g].addEventListener('click', function (ev) {
-                    var node = ev.currentTarget.getAttribute('data-node');
-                    if (node && window.vscode) {
-                        window.vscode.postMessage({ command: 'openFile', text: node });
-                    }
+            for (var i = 0; i < nodes.length; i++) {
+                var n = nodes[i];
+                var g = createEl('g');
+                g.setAttribute('data-node', n.id);
+                g.style.cursor = 'grab';
+
+                var c = createEl('circle');
+                c.setAttribute('r', '12');
+                c.setAttribute('fill', '#58a6ff');
+                c.setAttribute('stroke', '#ffffff');
+                c.setAttribute('stroke-width', '1.8');
+
+                var t = createEl('text');
+                t.setAttribute('fill', '#ffffff');
+                t.setAttribute('font-size', '11');
+                t.setAttribute('text-anchor', 'middle');
+                t.setAttribute('dominant-baseline', 'hanging');
+                t.textContent = n.label;
+
+                var title = createEl('title');
+                title.textContent = n.id;
+
+                g.appendChild(c);
+                g.appendChild(t);
+                g.appendChild(title);
+                nodeLayer.appendChild(g);
+
+                n.g = g;
+                n.circle = c;
+                n.text = t;
+                n.dragging = false;
+
+                g.addEventListener('click', (function (id) {
+                    return function () {
+                        if (window.vscode) {
+                            window.vscode.postMessage({ command: 'openFile', text: id });
+                        }
+                    };
+                })(n.id));
+            }
+
+            container.innerHTML = '';
+            container.appendChild(svg);
+
+            var transform = { x: 0, y: 0, k: 1 };
+            var panning = false;
+            var panStart = null;
+
+            function applyTransform() {
+                viewport.setAttribute('transform', 'translate(' + transform.x + ',' + transform.y + ') scale(' + transform.k + ')');
+            }
+
+            function getSvgPoint(evt) {
+                var rect = svg.getBoundingClientRect();
+                return {
+                    x: (evt.clientX - rect.left - transform.x) / transform.k,
+                    y: (evt.clientY - rect.top - transform.y) / transform.k
+                };
+            }
+
+            svg.addEventListener('wheel', function (evt) {
+                evt.preventDefault();
+                var before = getSvgPoint(evt);
+                var factor = evt.deltaY < 0 ? 1.08 : 0.92;
+                transform.k = Math.max(0.25, Math.min(3.5, transform.k * factor));
+                var rect = svg.getBoundingClientRect();
+                transform.x = evt.clientX - rect.left - before.x * transform.k;
+                transform.y = evt.clientY - rect.top - before.y * transform.k;
+                applyTransform();
+            }, { passive: false });
+
+            svg.addEventListener('mousedown', function (evt) {
+                if (evt.target === svg || evt.target === edgeLayer || evt.target === viewport) {
+                    panning = true;
+                    panStart = { x: evt.clientX, y: evt.clientY, tx: transform.x, ty: transform.y };
+                }
+            });
+
+            window.addEventListener('mousemove', function (evt) {
+                if (panning && panStart) {
+                    transform.x = panStart.tx + (evt.clientX - panStart.x);
+                    transform.y = panStart.ty + (evt.clientY - panStart.y);
+                    applyTransform();
+                }
+            });
+
+            window.addEventListener('mouseup', function () {
+                panning = false;
+                panStart = null;
+            });
+
+            function addDrag(node) {
+                node.g.addEventListener('mousedown', function (evt) {
+                    evt.stopPropagation();
+                    node.dragging = true;
+                    node.g.style.cursor = 'grabbing';
                 });
             }
+
+            for (var nd = 0; nd < nodes.length; nd++) {
+                addDrag(nodes[nd]);
+            }
+
+            window.addEventListener('mousemove', function (evt) {
+                for (var dn = 0; dn < nodes.length; dn++) {
+                    var node = nodes[dn];
+                    if (!node.dragging) continue;
+                    var p = getSvgPoint(evt);
+                    node.x = p.x;
+                    node.y = p.y;
+                    node.vx = 0;
+                    node.vy = 0;
+                }
+            });
+
+            window.addEventListener('mouseup', function () {
+                for (var dn = 0; dn < nodes.length; dn++) {
+                    nodes[dn].dragging = false;
+                    nodes[dn].g.style.cursor = 'grab';
+                }
+            });
+
+            function clamp(node) {
+                var pad = 18;
+                node.x = Math.max(pad, Math.min(width - pad, node.x));
+                node.y = Math.max(pad, Math.min(height - pad, node.y));
+            }
+
+            function step() {
+                var repel = 2600;
+                var spring = 0.0018;
+                var damp = 0.9;
+                var ideal = Math.max(90, Math.min(160, Math.sqrt((width * height) / Math.max(nodes.length, 1))));
+
+                for (var a = 0; a < nodes.length; a++) {
+                    var na = nodes[a];
+                    if (!na.visible || na.dragging) continue;
+                    for (var b = a + 1; b < nodes.length; b++) {
+                        var nb = nodes[b];
+                        if (!nb.visible || nb.dragging) continue;
+                        var dx = na.x - nb.x;
+                        var dy = na.y - nb.y;
+                        var dist2 = dx * dx + dy * dy + 0.01;
+                        var f = repel / dist2;
+                        na.vx += (dx / Math.sqrt(dist2)) * f;
+                        na.vy += (dy / Math.sqrt(dist2)) * f;
+                        nb.vx -= (dx / Math.sqrt(dist2)) * f;
+                        nb.vy -= (dy / Math.sqrt(dist2)) * f;
+                    }
+                }
+
+                for (var l = 0; l < links.length; l++) {
+                    var link = links[l];
+                    if (!link.visible) continue;
+                    var sNode = link.source;
+                    var tNode = link.target;
+                    var lx = tNode.x - sNode.x;
+                    var ly = tNode.y - sNode.y;
+                    var dist = Math.sqrt(lx * lx + ly * ly) || 0.001;
+                    var pull = (dist - ideal) * spring;
+                    var ux = lx / dist;
+                    var uy = ly / dist;
+                    if (!sNode.dragging) {
+                        sNode.vx += ux * pull;
+                        sNode.vy += uy * pull;
+                    }
+                    if (!tNode.dragging) {
+                        tNode.vx -= ux * pull;
+                        tNode.vy -= uy * pull;
+                    }
+                }
+
+                for (var m = 0; m < nodes.length; m++) {
+                    var nNode = nodes[m];
+                    if (!nNode.visible || nNode.dragging) continue;
+                    nNode.vx *= damp;
+                    nNode.vy *= damp;
+                    nNode.x += nNode.vx * 0.12;
+                    nNode.y += nNode.vy * 0.12;
+                    clamp(nNode);
+                }
+            }
+
+            function render() {
+                for (var ei = 0; ei < links.length; ei++) {
+                    var e = links[ei];
+                    e.el.setAttribute('display', e.visible ? 'inline' : 'none');
+                    if (!e.visible) continue;
+                    e.el.setAttribute('x1', e.source.x.toFixed(2));
+                    e.el.setAttribute('y1', e.source.y.toFixed(2));
+                    e.el.setAttribute('x2', e.target.x.toFixed(2));
+                    e.el.setAttribute('y2', e.target.y.toFixed(2));
+                }
+
+                for (var vi = 0; vi < nodes.length; vi++) {
+                    var vn = nodes[vi];
+                    vn.g.setAttribute('display', vn.visible ? 'inline' : 'none');
+                    if (!vn.visible) continue;
+                    vn.circle.setAttribute('cx', vn.x.toFixed(2));
+                    vn.circle.setAttribute('cy', vn.y.toFixed(2));
+                    vn.text.setAttribute('x', vn.x.toFixed(2));
+                    vn.text.setAttribute('y', (vn.y + 20).toFixed(2));
+                }
+            }
+
+            function loop() {
+                step();
+                render();
+                requestAnimationFrame(loop);
+            }
+
+            function applyFilter(raw) {
+                var q = (raw || '').toLowerCase();
+                var visibleIds = {};
+
+                for (var i = 0; i < nodes.length; i++) {
+                    var node = nodes[i];
+                    node.visible = !q || node.id.toLowerCase().indexOf(q) >= 0;
+                    if (node.visible) {
+                        visibleIds[node.id] = true;
+                    }
+                }
+
+                for (var j = 0; j < links.length; j++) {
+                    var lk = links[j];
+                    lk.visible = !q || visibleIds[lk.source.id] || visibleIds[lk.target.id];
+                    if (q && lk.visible) {
+                        lk.source.visible = true;
+                        lk.target.visible = true;
+                    }
+                }
+            }
+
+            function exportPng() {
+                try {
+                    var serialized = new XMLSerializer().serializeToString(svg);
+                    var blob = new Blob([serialized], { type: 'image/svg+xml;charset=utf-8' });
+                    var url = URL.createObjectURL(blob);
+                    var img = new Image();
+                    img.onload = function () {
+                        try {
+                            var canvas = document.createElement('canvas');
+                            canvas.width = width;
+                            canvas.height = height;
+                            var ctx = canvas.getContext('2d');
+                            if (!ctx) {
+                                return;
+                            }
+                            ctx.fillStyle = '#111111';
+                            ctx.fillRect(0, 0, width, height);
+                            ctx.drawImage(img, 0, 0);
+                            var b64 = canvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
+                            if (window.vscode) {
+                                window.vscode.postMessage({ command: 'saveImage', data: b64 });
+                            }
+                        } finally {
+                            URL.revokeObjectURL(url);
+                        }
+                    };
+                    img.onerror = function () {
+                        URL.revokeObjectURL(url);
+                    };
+                    img.src = url;
+                } catch (err) {
+                    if (window.vscode) {
+                        window.vscode.postMessage({ command: 'error', text: 'Fallback export failed: ' + err });
+                    }
+                }
+            }
+
+            var filterInput = document.getElementById('filter');
+            var resetButton = document.getElementById('reset');
+            var exportButton = document.getElementById('export');
+
+            if (filterInput) {
+                filterInput.addEventListener('input', function (evt) {
+                    var val = evt && evt.target ? evt.target.value : '';
+                    applyFilter(val);
+                    render();
+                });
+            }
+
+            if (resetButton) {
+                resetButton.addEventListener('click', function () {
+                    if (filterInput) {
+                        filterInput.value = '';
+                    }
+                    applyFilter('');
+                    transform = { x: 0, y: 0, k: 1 };
+                    applyTransform();
+                    render();
+                });
+            }
+
+            if (exportButton) {
+                exportButton.addEventListener('click', exportPng);
+            }
+
+            window.addEventListener('message', function (event) {
+                var payload = event && event.data ? event.data : null;
+                if (!payload || payload.command !== 'triggerExport') {
+                    return;
+                }
+                exportPng();
+            });
+
+            applyFilter('');
+            applyTransform();
+            render();
+            loop();
         }, 1200);
     </script>
     <script src="{{scriptUri}}"></script>
