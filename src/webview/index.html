@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graphium Dependency Graph</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/layout-base/layout-base.js"></script>
+    <script src="https://unpkg.com/cose-base/cose-base.js"></script>
+    <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
+    <script src="https://unpkg.com/@popperjs/core@2"></script>
+    <script src="https://unpkg.com/tippy.js@6"></script>
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; img-src {{cspSource}} https: data:; script-src 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com {{cspSource}}; style-src 'unsafe-inline' https://unpkg.com {{cspSource}};">
+    <script src="https://unpkg.com/cytoscape-popper/cytoscape-popper.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/tippy.js@6/dist/tippy.css" />
+    <link href="{{styleUri}}" rel="stylesheet">
+</head>
+
+<body>
+    <div id="error-display"
+        style="display:none; padding: 20px; color: #f85149; background: #111111; border: 1px solid #f85149; position: fixed; top: 0; left: 0; right: 0; z-index: 10000; font-family: monospace; white-space: pre-wrap;">
+    </div>
+    <script>
+        window.vscode = acquireVsCodeApi();
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
+            const err = { message: msg, url: url, line: lineNo, col: columnNo, stack: error ? error.stack : 'no stack' };
+            vscode.postMessage({ command: 'error', text: JSON.stringify(err) });
+            const display = document.getElementById('error-display');
+            display.style.display = 'block';
+            display.innerText += 'Error: ' + msg + '\nLine: ' + lineNo + '\n';
+            return false;
+        };
+        console.log = function () {
+            vscode.postMessage({ command: 'log', text: Array.from(arguments).join(' ') });
+        };
+        console.error = function () {
+            vscode.postMessage({ command: 'error', text: Array.from(arguments).join(' ') });
+        };
+    </script>
+    <div id="controls">
+        <input type="text" id="filter" placeholder="Filter nodes...">
+        <button id="reset">Reset View</button>
+        <button id="export">Export PNG</button>
+    </div>
+    <div id="cy">
+        <div style="padding: 20px; color: #ffffff;">Initializing Graphium... If this stays blank, check VS Code
+            developer console.</div>
+    </div>
+
+    <script id="graphium-data" type="application/json">{{graphData}}</script>
+    <script id="cycle-data" type="application/json">{{cycleData}}</script>
+    <script>
+        window.graphData = JSON.parse(document.getElementById('graphium-data').textContent || '{}');
+        window.cycleData = JSON.parse(document.getElementById('cycle-data').textContent || '[]');
+    </script>
+    <script src="{{scriptUri}}"></script>
+</body>
+
+</html>

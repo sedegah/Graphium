@@ -1,0 +1,81 @@
+{
+  "name": "graphium",
+  "displayName": "Graphium",
+  "publisher": "graphium-dev",
+  "icon": "1.png",
+  "description": "Visualize the structure and dependencies of a codebase interactively in VS Code",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "graphium-explorer",
+          "title": "Graphium",
+          "icon": "1.png"
+        }
+      ]
+    },
+    "views": {
+      "graphium-explorer": [
+        {
+          "type": "webview",
+          "id": "graphiumSidebar",
+          "name": "Graphium Tools",
+          "icon": "1.png",
+          "visibility": "visible"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "graphium.generateGraph",
+        "title": "Graphium: Generate Dependency Graph"
+      },
+      {
+        "command": "graphium.refreshGraph",
+        "title": "Graphium: Refresh Graph"
+      },
+      {
+        "command": "graphium.exportGraph",
+        "title": "Graphium: Export Graph"
+      },
+      {
+        "command": "graphium.toggleFilter",
+        "title": "Graphium: Toggle Filter"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/babel__traverse": "^7.20.5",
+    "@types/node": "^18.x",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.7.1",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.24.0",
+    "@babel/traverse": "^7.24.0",
+    "@popperjs/core": "^2.11.8",
+    "cose-base": "^2.2.0",
+    "cytoscape": "^3.33.1",
+    "cytoscape-fcose": "^2.2.0",
+    "cytoscape-popper": "^4.0.1",
+    "layout-base": "^2.0.1",
+    "tippy.js": "^6.3.7"
+  }
+}
