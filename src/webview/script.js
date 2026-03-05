@@ -6,7 +6,8 @@ try {
         cytoscape.use(window.cytoscapeFcose);
     }
     if (typeof window.cytoscapePopper !== 'undefined') {
-        cytoscape.use(window.cytoscapePopper);
+        // In UMD/Local, cytoscapePopper is a factory that needs the Popper library
+        cytoscape.use(window.cytoscapePopper(window.Popper));
     }
 } catch (e) {
     console.error('Plugin registration failed:', e);
