@@ -5,16 +5,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Graphium Dependency Graph</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
-    <script src="https://unpkg.com/layout-base/layout-base.js"></script>
-    <script src="https://unpkg.com/cose-base/cose-base.js"></script>
-    <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
-    <script src="https://unpkg.com/@popperjs/core@2"></script>
-    <script src="https://unpkg.com/tippy.js@6"></script>
+    <script src="{{libCytoscape}}"></script>
+    <script src="{{libLayoutBase}}"></script>
+    <script src="{{libCoseBase}}"></script>
+    <script src="{{libFcose}}"></script>
+    <script src="{{libPopper}}"></script>
+    <script src="{{libTippy}}"></script>
+    <script src="{{libCyPopper}}"></script>
     <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none'; img-src {{cspSource}} https: data:; script-src 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com {{cspSource}}; style-src 'unsafe-inline' https://unpkg.com {{cspSource}};">
-    <script src="https://unpkg.com/cytoscape-popper/cytoscape-popper.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/tippy.js@6/dist/tippy.css" />
+        content="default-src 'none'; img-src {{cspSource}} https: data:; script-src 'unsafe-inline' {{cspSource}}; style-src 'unsafe-inline' {{cspSource}};">
+    <link rel="stylesheet" href="{{libTippyCss}}" />
     <link href="{{styleUri}}" rel="stylesheet">
 </head>
 
