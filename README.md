@@ -1,34 +1,46 @@
 # Graphium
 
-Graphium is a high-performance visual dependency analyzer for modern JavaScript and TypeScript codebases. It extracts detailed AST-level insights and represents them as a beautifully interactive graph right within a VS Code panel, designed with keyboard-first workflows in mind.
+Graphium visualizes file-level dependencies in JavaScript and TypeScript workspaces directly inside VS Code.
+
+It helps you inspect architecture, spot circular dependencies, and export graph snapshots for reviews or documentation.
 
 ## Features
 
-- **Interactive Dependency Mapping**: Generates a webview using Cytoscape.js highlighting the exact file-level imports across your repository.
-- **Deep AST Extraction**: Extracts exported functions and classes. Hover over any node in the graph to see exactly what constructs are exported from that file.
-- **Fast Generation**: Uses modified-time caching (`mtime`) so only files that have changed map re-parse.
-- **DevDeck Inspired UI**: Clean, keyboard shortcut driven (`Ctrl+K` to search), dark-themed VS Code native aesthetic.
-- **Cycle Detection**: Automatically flags cyclic dependency loops in your architecture, rendering their edges in bright red.
-- **Export to PNG**: Found something interesting? Type `Graphium: Export Graph` to save the structural visualization.
+- Interactive dependency graph rendered in a full-size webview.
+- Circular dependency detection with visual highlighting.
+- Fast scans with file modification time (`mtime`) caching.
+- Filter nodes by file name or path.
+- Reset graph layout and export the current view to PNG.
 
-## Usage
+## Commands
 
-1. Open a workspace folder that contains a JS or TS project.
-2. Open the command palette (`Ctrl/Shift/P` or `Cmd/Shift/P`).
-3. Run `Graphium: Generate Dependency Graph`.
-4. Press `Ctrl+K` while inside the Graphium panel to filter out specific services or files.
+- `Graphium: Generate Dependency Graph`
+- `Graphium: Refresh Graph`
+- `Graphium: Export Graph`
 
-## Extension Settings
+## How To Use
 
-Graphium is designed to be zero-config.
+1. Open a JavaScript or TypeScript workspace.
+2. Run `Graphium: Generate Dependency Graph` from the Command Palette.
+3. Use the graph toolbar to filter nodes, reset layout, or export PNG.
+4. Click any node to open the corresponding file.
+
+## Notes
+
+- Graphium scans `*.js`, `*.jsx`, `*.ts`, and `*.tsx` files.
+- Common generated folders are excluded (`node_modules`, `dist`, `out`, `.next`, `coverage`, `.git`).
 
 ## Development
 
 - `npm install`
 - `npm run compile`
+- Press `F5` in VS Code to launch an Extension Development Host.
 
-## Release Notes
+## Packaging And Publish
 
-### 0.1.0
+- `npm run package` to build a `.vsix` package.
+- `npm run publish` to publish to the VS Code Marketplace.
 
-Initial MVP Release featuring JS/TS Babel Parsing, Circular Dependency Detection, Cytoscape `fcose` layout, image exporting, matching DevDeck styling rules.
+## License
+
+MIT. See `LICENSE` for details.
