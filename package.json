@@ -32,12 +32,6 @@
     "cytoscape",
     "code-visualization"
   ],
-  "activationEvents": [
-    "onCommand:graphium.generateGraph",
-    "onCommand:graphium.refreshGraph",
-    "onCommand:graphium.exportGraph",
-    "onView:graphiumSidebar"
-  ],
   "files": [
     "out/**",
     "media/**",
