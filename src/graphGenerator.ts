@@ -97,8 +97,21 @@ export async function generateDependencyGraph(context: vscode.ExtensionContext) 
     }
 
     const htmlPath = vscode.Uri.joinPath(context.extensionUri, 'src', 'webview', 'index.html').fsPath;
-    const cssUri = currentPanel.webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'src', 'webview', 'style.css'));
-    const jsUri = currentPanel.webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'src', 'webview', 'script.js'));
+    const webview = currentPanel.webview;
+    const extensionUri = context.extensionUri;
+
+    const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'src', 'webview', 'style.css'));
+    const jsUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'src', 'webview', 'script.js'));
+
+    // Local libraries
+    const libCytoscape = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'src', 'webview', 'libs', 'cytoscape.min.js'));
+    const libLayoutBase = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'src', 'webview', 'libs', 'layout-base.js'));
+    const libCoseBase = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'src', 'webview', 'libs', 'cose-base.js'));
+    const libFcose = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'src', 'webview', 'libs', 'cytoscape-fcose.js'));
+    const libPopper = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'src', 'webview', 'libs', 'popper.min.js'));
+    const libTippy = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'src', 'webview', 'libs', 'tippy.umd.min.js'));
+    const libCyPopper = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'src', 'webview', 'libs', 'cytoscape-popper.js'));
+    const libTippyCss = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'src', 'webview', 'libs', 'tippy.css'));
 
     let htmlContent = fs.readFileSync(htmlPath, 'utf8');
 
@@ -106,14 +119,23 @@ export async function generateDependencyGraph(context: vscode.ExtensionContext) 
     htmlContent = htmlContent
         .replace('{{styleUri}}', cssUri.toString())
         .replace('{{scriptUri}}', jsUri.toString())
-        .replace('{{cspSource}}', currentPanel.webview.cspSource)
+        .replace('{{cspSource}}', webview.cspSource)
         .replace('{{graphData}}', JSON.stringify(dependencyMap))
-        .replace('{{cycleData}}', JSON.stringify(cycles));
+        .replace('{{cycleData}}', JSON.stringify(cycles))
+        // Libraries
+        .replace('{{libCytoscape}}', libCytoscape.toString())
+        .replace('{{libLayoutBase}}', libLayoutBase.toString())
+        .replace('{{libCoseBase}}', libCoseBase.toString())
+        .replace('{{libFcose}}', libFcose.toString())
+        .replace('{{libPopper}}', libPopper.toString())
+        .replace('{{libTippy}}', libTippy.toString())
+        .replace('{{libCyPopper}}', libCyPopper.toString())
+        .replace('{{libTippyCss}}', libTippyCss.toString());
 
-    currentPanel.webview.html = htmlContent;
+    webview.html = htmlContent;
 
     // Handle messages from webview
-    currentPanel.webview.onDidReceiveMessage(
+    webview.onDidReceiveMessage(
         async message => {
             switch (message.command) {
                 case 'log':
