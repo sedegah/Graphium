@@ -1,7 +1,7 @@
 {
   "name": "graphium",
   "displayName": "Graphium",
-  "publisher": "graphium-dev",
+  "publisher": "KimathiSedegah",
   "icon": "1.png",
   "description": "Dependency graph generator for codebases",
   "version": "0.1.0",
