@@ -1,4 +1,5 @@
 // window.vscode is acquired in index.html
+window.__graphiumBooted = true;
 
 const COLORS = {
     ts: '#007acc',
