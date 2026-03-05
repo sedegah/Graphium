@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import { generateDependencyGraph } from './graphGenerator';
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
 	public static readonly viewType = 'graphiumSidebar';
@@ -9,7 +8,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
 	public resolveWebviewView(
 		webviewView: vscode.WebviewView,
-		context: vscode.WebviewViewResolveContext,
+        _context: vscode.WebviewViewResolveContext,
 		_token: vscode.CancellationToken,
 	) {
 		this._view = webviewView;
@@ -21,10 +20,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
 		webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-		webviewView.webview.onDidReceiveMessage(data => {
+        webviewView.webview.onDidReceiveMessage(data => {
 			switch (data.command) {
 				case 'generate':
-					vscode.commands.executeCommand('graphium.generateGraph');
+                    void vscode.commands.executeCommand('graphium.generateGraph');
 					break;
 			}
 		});
@@ -32,7 +31,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
 	public updateStats(stats: { files: number, deps: number, cycles: number }) {
 		if (this._view) {
-			this._view.webview.postMessage({ command: 'updateStats', data: stats });
+            void this._view.webview.postMessage({ command: 'updateStats', data: stats });
 		}
 	}
 
