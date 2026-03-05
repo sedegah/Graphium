@@ -12,6 +12,12 @@ interface CacheEntry {
 const parseCache = new Map<string, CacheEntry>();
 export let currentPanel: vscode.WebviewPanel | undefined;
 let webviewMessageDisposable: vscode.Disposable | undefined;
+const MAX_SCAN_FILES = 4000;
+const YIELD_EVERY = 25;
+
+async function yieldToEventLoop() {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+}
 
 function escapeForInlineScript(json: string): string {
     return json.replace(/<\//g, '<\\/').replace(/<!--/g, '<\\!--');
@@ -27,61 +33,116 @@ export async function generateDependencyGraph(context: vscode.ExtensionContext) 
     const rootPath = workspaceFolders[0].uri.fsPath;
 
     // Find all JS/TS files while ignoring common generated directories.
-    const files = await vscode.workspace.findFiles(
+    const foundFiles = await vscode.workspace.findFiles(
         '**/*.{js,ts,jsx,tsx}',
         '**/{node_modules,out,dist,.next,coverage,.git,src/webview/libs,media}/**'
     );
 
-    const dependencyMap: Record<string, FileMetadata> = {};
+    const files = foundFiles.filter((file) => {
+        const p = file.fsPath;
+        return !p.endsWith('.d.ts') && !p.endsWith('.min.js');
+    });
 
-    for (const file of files) {
-        try {
-            const relativePath = path.relative(rootPath, file.fsPath).replace(/\\/g, '/');
-            const stats = fs.statSync(file.fsPath);
-            const mtime = stats.mtimeMs;
-
-            const cached = parseCache.get(file.fsPath);
-
-            if (cached && cached.mtime === mtime) {
-                dependencyMap[relativePath] = cached.metadata;
-            } else {
-                const metadata = parseFileForDependencies(file.fsPath, rootPath);
-                parseCache.set(file.fsPath, { mtime, metadata });
-                dependencyMap[relativePath] = metadata;
-            }
-        } catch (e) {
-            console.error(`Graphium: Error parsing file ${file.fsPath}`, e);
-        }
+    if (files.length === 0) {
+        void vscode.window.showInformationMessage('Graphium: No source files found to scan.');
+        return { files: 0, deps: 0, cycles: 0 };
     }
 
-    // Detect circular dependencies for workspace-local files only.
-    const localFiles = new Set(Object.keys(dependencyMap));
-    const cycles: [string, string][] = [];
-    const visited = new Set<string>();
-    const recStack = new Set<string>();
+    if (files.length > MAX_SCAN_FILES) {
+        void vscode.window.showWarningMessage(`Graphium: Large workspace detected. Scanning first ${MAX_SCAN_FILES} files out of ${files.length} to keep VS Code responsive.`);
+    }
 
-    function detectCycle(node: string) {
-        if (!visited.has(node)) {
-            visited.add(node);
-            recStack.add(node);
+    const scanFiles = files.slice(0, MAX_SCAN_FILES);
 
-            const deps = dependencyMap[node]?.dependencies || [];
-            for (const dep of deps) {
-                if (!localFiles.has(dep.path)) {
-                    continue;
+    const generationResult = await vscode.window.withProgress(
+        {
+            location: vscode.ProgressLocation.Notification,
+            title: 'Graphium: Generating dependency graph...',
+            cancellable: true
+        },
+        async (progress, token) => {
+            const dependencyMap: Record<string, FileMetadata> = {};
+
+            for (let i = 0; i < scanFiles.length; i++) {
+                if (token.isCancellationRequested) {
+                    void vscode.window.showInformationMessage('Graphium: Scan cancelled.');
+                    return;
                 }
-                if (!visited.has(dep.path)) {
-                    detectCycle(dep.path);
-                } else if (recStack.has(dep.path)) {
-                    cycles.push([node, dep.path]);
+
+                const file = scanFiles[i];
+                try {
+                    const relativePath = path.relative(rootPath, file.fsPath).replace(/\\/g, '/');
+                    const stats = fs.statSync(file.fsPath);
+                    const mtime = stats.mtimeMs;
+
+                    const cached = parseCache.get(file.fsPath);
+
+                    if (cached && cached.mtime === mtime) {
+                        dependencyMap[relativePath] = cached.metadata;
+                    } else {
+                        const metadata = parseFileForDependencies(file.fsPath, rootPath);
+                        parseCache.set(file.fsPath, { mtime, metadata });
+                        dependencyMap[relativePath] = metadata;
+                    }
+                } catch (e) {
+                    console.error(`Graphium: Error parsing file ${file.fsPath}`, e);
+                }
+
+                if (i % YIELD_EVERY === 0) {
+                    progress.report({ message: `Parsing files ${i + 1}/${scanFiles.length}` });
+                    await yieldToEventLoop();
                 }
             }
+
+            const localFiles = new Set(Object.keys(dependencyMap));
+            const cycles: [string, string][] = [];
+            const visited = new Set<string>();
+            const recStack = new Set<string>();
+
+            function detectCycle(node: string) {
+                if (!visited.has(node)) {
+                    visited.add(node);
+                    recStack.add(node);
+
+                    const deps = dependencyMap[node]?.dependencies || [];
+                    for (const dep of deps) {
+                        if (!localFiles.has(dep.path)) {
+                            continue;
+                        }
+                        if (!visited.has(dep.path)) {
+                            detectCycle(dep.path);
+                        } else if (recStack.has(dep.path)) {
+                            cycles.push([node, dep.path]);
+                        }
+                    }
+                }
+                recStack.delete(node);
+            }
+
+            const nodes = Object.keys(dependencyMap);
+            for (let i = 0; i < nodes.length; i++) {
+                if (token.isCancellationRequested) {
+                    void vscode.window.showInformationMessage('Graphium: Cycle detection cancelled.');
+                    return;
+                }
+
+                detectCycle(nodes[i]);
+
+                if (i % YIELD_EVERY === 0) {
+                    progress.report({ message: `Detecting cycles ${i + 1}/${nodes.length}` });
+                    await yieldToEventLoop();
+                }
+            }
+
+            return { dependencyMap, cycles };
         }
-        recStack.delete(node);
+    );
+
+    if (!generationResult) {
+        return;
     }
-    for (const node of Object.keys(dependencyMap)) {
-        detectCycle(node);
-    }
+
+    const { dependencyMap, cycles } = generationResult;
 
     // Create or reveal webview
     if (currentPanel) {
