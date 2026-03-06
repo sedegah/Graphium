@@ -1,7 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as babelParser from '@babel/parser';
-import traverse from '@babel/traverse';
+
+// @ts-ignore
+const traverse = require('@babel/traverse').default || require('@babel/traverse');
 
 export interface Dependency {
     path: string;
@@ -36,7 +38,7 @@ export function parseFileForDependencies(filePath: string, rootPath: string): Fi
     const absoluteDir = path.dirname(filePath);
 
     // Helper to resolve and record dependency
-    const addDependency = (importPath: string, symbols: string[] = []) => {
+    const _addDependency = (importPath: string, symbols: string[] = []) => {
         let resolvedPath = importPath;
         if (importPath.startsWith('.')) {
             let absoluteImport = path.resolve(absoluteDir, importPath);
@@ -47,7 +49,6 @@ export function parseFileForDependencies(filePath: string, rootPath: string): Fi
                 else if (fs.existsSync(absoluteImport + '.tsx')) absoluteImport += '.tsx';
                 else if (fs.existsSync(absoluteImport + '.jsx')) absoluteImport += '.jsx';
                 else if (fs.existsSync(path.join(absoluteImport, 'index.ts'))) absoluteImport = path.join(absoluteImport, 'index.ts');
-                else if (fs.existsSync(path.join(absoluteImport, 'index.js'))) absoluteImport = path.join(absoluteImport, 'index.js');
             }
 
             resolvedPath = path.relative(rootPath, absoluteImport).replace(/\\/g, '/');
@@ -73,14 +74,14 @@ export function parseFileForDependencies(filePath: string, rootPath: string): Fi
                     symbols.push('*');
                 }
             });
-            addDependency(pathNode.node.source.value, symbols);
+            _addDependency(pathNode.node.source.value, symbols);
         },
         CallExpression(pathNode: any) {
             if (pathNode.node.callee.type === 'Import' ||
                 (pathNode.node.callee.type === 'Identifier' && pathNode.node.callee.name === 'require')) {
                 const arg = pathNode.node.arguments[0];
                 if (arg && arg.type === 'StringLiteral') {
-                    addDependency(arg.value);
+                    _addDependency(arg.value);
                 }
             }
         },

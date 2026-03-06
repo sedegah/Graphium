@@ -164,12 +164,31 @@ function renderWithCytoscape(container) {
             name: lastLayoutName,
             fit: true,
             padding: 40,
-            animate: !perfMode.large
+            animate: !perfMode.large,
+            stop: function() {
+                // Lock nodes in place after layout completes to prevent free roam
+                cy.nodes().lock();
+            },
+            // Disable continuous layout to prevent free roam
+            animate: false,
+            animationDuration: 0
         }
     });
 
     cy.on('tap', 'node', (evt) => {
         window.vscode.postMessage({ command: 'openFile', text: evt.target.id() });
+    });
+
+    // Enable dragging functionality while preventing free roam
+    cy.on('grab', 'node', (evt) => {
+        const node = evt.target;
+        node.unlock();
+    });
+
+    cy.on('free', 'node', (evt) => {
+        const node = evt.target;
+        // Re-lock after dragging stops
+        setTimeout(() => node.lock(), 100);
     });
 
     if (typeof window.tippy === 'function' && !perfMode.large) {
@@ -423,7 +442,18 @@ resetButton.addEventListener('click', () => {
     filterInput.value = '';
     if (cy) {
         cy.elements().show();
-        cy.layout({ name: lastLayoutName, animate: !perfMode.large, fit: true, padding: 40 }).run();
+        // Unlock all nodes for layout, then re-lock after completion
+        cy.nodes().unlock();
+        cy.layout({ 
+            name: lastLayoutName, 
+            animate: false, 
+            animationDuration: 0,
+            fit: true, 
+            padding: 40,
+            stop: function() {
+                cy.nodes().lock();
+            }
+        }).run();
         return;
     }
     if (fallbackApi) {

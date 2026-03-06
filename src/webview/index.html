@@ -264,6 +264,7 @@
             }
 
             window.addEventListener('mousemove', function (evt) {
+                var needsRender = false;
                 for (var dn = 0; dn < nodes.length; dn++) {
                     var node = nodes[dn];
                     if (!node.dragging) continue;
@@ -272,6 +273,10 @@
                     node.y = p.y;
                     node.vx = 0;
                     node.vy = 0;
+                    needsRender = true;
+                }
+                if (needsRender) {
+                    render();
                 }
             });
 
@@ -288,59 +293,10 @@
                 node.y = Math.max(pad, Math.min(height - pad, node.y));
             }
 
+            // Static positioning - no physics simulation
             function step() {
-                var repel = 2600;
-                var spring = 0.0018;
-                var damp = 0.9;
-                var ideal = Math.max(90, Math.min(160, Math.sqrt((width * height) / Math.max(nodes.length, 1))));
-
-                for (var a = 0; a < nodes.length; a++) {
-                    var na = nodes[a];
-                    if (!na.visible || na.dragging) continue;
-                    for (var b = a + 1; b < nodes.length; b++) {
-                        var nb = nodes[b];
-                        if (!nb.visible || nb.dragging) continue;
-                        var dx = na.x - nb.x;
-                        var dy = na.y - nb.y;
-                        var dist2 = dx * dx + dy * dy + 0.01;
-                        var f = repel / dist2;
-                        na.vx += (dx / Math.sqrt(dist2)) * f;
-                        na.vy += (dy / Math.sqrt(dist2)) * f;
-                        nb.vx -= (dx / Math.sqrt(dist2)) * f;
-                        nb.vy -= (dy / Math.sqrt(dist2)) * f;
-                    }
-                }
-
-                for (var l = 0; l < links.length; l++) {
-                    var link = links[l];
-                    if (!link.visible) continue;
-                    var sNode = link.source;
-                    var tNode = link.target;
-                    var lx = tNode.x - sNode.x;
-                    var ly = tNode.y - sNode.y;
-                    var dist = Math.sqrt(lx * lx + ly * ly) || 0.001;
-                    var pull = (dist - ideal) * spring;
-                    var ux = lx / dist;
-                    var uy = ly / dist;
-                    if (!sNode.dragging) {
-                        sNode.vx += ux * pull;
-                        sNode.vy += uy * pull;
-                    }
-                    if (!tNode.dragging) {
-                        tNode.vx -= ux * pull;
-                        tNode.vy -= uy * pull;
-                    }
-                }
-
-                for (var m = 0; m < nodes.length; m++) {
-                    var nNode = nodes[m];
-                    if (!nNode.visible || nNode.dragging) continue;
-                    nNode.vx *= damp;
-                    nNode.vy *= damp;
-                    nNode.x += nNode.vx * 0.12;
-                    nNode.y += nNode.vy * 0.12;
-                    clamp(nNode);
-                }
+                // Disabled: Remove force-directed simulation to prevent free roam
+                return;
             }
 
             function render() {
@@ -365,10 +321,10 @@
                 }
             }
 
+            // Static rendering - no animation loop
             function loop() {
-                step();
-                render();
-                requestAnimationFrame(loop);
+                // Disabled: Remove continuous animation to prevent free roam
+                return;
             }
 
             function applyFilter(raw) {
@@ -469,7 +425,8 @@
             applyFilter('');
             applyTransform();
             render();
-            loop();
+            // Disabled: Remove animation loop to prevent free roam
+            // loop();
         }, 1200);
     </script>
     <script src="{{scriptUri}}"></script>

@@ -1,7 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { parseFileForDependencies, FileMetadata } from './parser';
+import { parseFileForDependencies, FileMetadata } from './parser/jsParser';
 
+// Cache: file path → last modified + parsed data
 interface CacheEntry {
     mtime: number;
     metadata: FileMetadata;
@@ -9,6 +10,15 @@ interface CacheEntry {
 
 const parseCache = new Map<string, CacheEntry>();
 const MAX_SCAN_FILES = 4000;
+const YIELD_EVERY = 25;
+
+async function yieldToEventLoop() {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+}
+
+function escapeForInlineScript(json: string): string {
+    return json.replace(/<\//g, '<\\/').replace(/<!--/g, '<\\!--');
+}
 
 export async function generateDependencyGraph(
     scanPath: string,
@@ -57,11 +67,12 @@ export async function generateDependencyGraph(
                 dependencyMap[relativePath] = metadata;
             }
         } catch (e) {
-            console.error(`[ERROR] Failed to parse ${file}:`, e instanceof Error ? e.message : e);
+            console.error(`[Graphium] Error parsing file ${file}`, e);
         }
 
-        if ((i + 1) % 50 === 0) {
-            console.log(`[INFO] Progress: ${i + 1}/${scanFiles.length} files`);
+        if (i % YIELD_EVERY === 0) {
+            console.log(`[INFO] Progress: Parsing files ${i + 1}/${scanFiles.length}`);
+            await yieldToEventLoop();
         }
     }
 
@@ -85,7 +96,8 @@ export async function generateDependencyGraph(
 
 function findFiles(rootPath: string): string[] {
     const results: string[] = [];
-    const excludeDirs = new Set(['node_modules', 'out', 'dist', '.next', 'coverage', '.git', 'libs', 'media', 'build', '__pycache__', '.vscode']);
+    // Updated exclude patterns to match VS Code version
+    const excludeDirs = new Set(['node_modules', 'out', 'dist', '.next', 'coverage', '.git', 'src/webview/libs', 'media', 'build', '__pycache__', '.vscode']);
 
     function scan(dir: string) {
         if (results.length >= MAX_SCAN_FILES) {
@@ -99,7 +111,13 @@ function findFiles(rootPath: string): string[] {
                 const fullPath = path.join(dir, entry.name);
 
                 if (entry.isDirectory()) {
-                    if (!excludeDirs.has(entry.name) && !entry.name.startsWith('.')) {
+                    // Check if directory should be excluded
+                    const relativePath = path.relative(rootPath, fullPath).replace(/\\/g, '/');
+                    const shouldExclude = excludeDirs.has(entry.name) || 
+                                        entry.name.startsWith('.') ||
+                                        excludeDirs.has(relativePath);
+                    
+                    if (!shouldExclude) {
                         scan(fullPath);
                     }
                 } else if (entry.isFile()) {
@@ -147,8 +165,12 @@ function detectCycles(dependencyMap: Record<string, FileMetadata>): [string, str
     }
 
     const nodes = Object.keys(dependencyMap);
-    for (const node of nodes) {
-        detectCycle(node);
+    for (let i = 0; i < nodes.length; i++) {
+        detectCycle(nodes[i]);
+        
+        if (i % YIELD_EVERY === 0) {
+            console.log(`[INFO] Progress: Detecting cycles ${i + 1}/${nodes.length}`);
+        }
     }
 
     return cycles;
