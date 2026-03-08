@@ -1,5 +1,5 @@
 {
-  "name": "graphium-cli",
+  "name": "@sedegah/graphium-cli",
   "version": "0.5.3",
   "description": "CLI tool to generate dependency graphs as HTML pages",
   "main": "dist/cli.js",
@@ -19,6 +19,19 @@
   ],
   "author": "Kimathi Elikplim Sedegah",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sedegah/Graphium.git",
+    "directory": "graphium-npm"
+  },
+  "homepage": "https://github.com/sedegah/Graphium/tree/main/graphium-npm",
+  "bugs": {
+    "url": "https://github.com/sedegah/Graphium/issues"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
   "devDependencies": {
     "@types/babel__traverse": "^7.28.0",
     "@types/node": "^20.0.0",
